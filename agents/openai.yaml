@@ -1,7 +1,7 @@
 interface:
-  display_name: "Dimer PPT Skills"
-  short_description: "Image to editable PPT with automatic text layout repair."
+  display_name: "Dimer PPT"
+  short_description: "Image-to-editable-PPT reconstruction with render-diff QA."
   brand_color: "#2563EB"
-  default_prompt: "Use $dimer-ppt-skills to convert this image into a truly editable PPTX, compare it with the original, and fix text overlap/layout drift."
+  default_prompt: "Use $dimer-ppt to convert this image into an editable PPTX, compare the PowerPoint render with the source, and repair any text containment or layout drift."
 policy:
   allow_implicit_invocation: true
