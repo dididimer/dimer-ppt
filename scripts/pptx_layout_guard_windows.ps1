@@ -48,12 +48,32 @@ function IntersectArea($a, $b) {
     return [double](($x2 - $x1) * ($y2 - $y1))
 }
 
+function ContainsBox($outer, $inner, [double]$tolerance = 0.5) {
+    return (
+        $outer.left -le ($inner.left + $tolerance) -and
+        $outer.top -le ($inner.top + $tolerance) -and
+        $outer.right -ge ($inner.right - $tolerance) -and
+        $outer.bottom -ge ($inner.bottom - $tolerance)
+    )
+}
+
+function IsOutOfBounds($box, [double]$slideWidth, [double]$slideHeight, [double]$tolerance = 0.5) {
+    return (
+        $box.left -lt -$tolerance -or
+        $box.top -lt -$tolerance -or
+        $box.right -gt ($slideWidth + $tolerance) -or
+        $box.bottom -gt ($slideHeight + $tolerance)
+    )
+}
+
 function ShapeInfo($slideIndex, $shape) {
     $box = Box $shape
     $hasText = $false
     $text = ""
     $boundW = 0.0
     $boundH = 0.0
+    $zOrder = 0
+    try { $zOrder = [int]$shape.ZOrderPosition } catch {}
     try {
         if ($shape.HasTextFrame -and $shape.TextFrame2.HasText) {
             $text = ConvertTo-PlainText $shape.TextFrame2.TextRange.Text
@@ -80,6 +100,7 @@ function ShapeInfo($slideIndex, $shape) {
         bottom = $box.bottom
         text_bound_width = $boundW
         text_bound_height = $boundH
+        z_order = $zOrder
     }
 }
 
@@ -118,8 +139,27 @@ try {
     for ($s = 1; $s -le $pres.Slides.Count; $s++) {
         $slide = $pres.Slides.Item($s)
         $infos = Collect-ShapeInfos $s $slide.Shapes
+        $slideWidth = [double]$pres.PageSetup.SlideWidth
+        $slideHeight = [double]$pres.PageSetup.SlideHeight
         for ($i = 0; $i -lt $infos.Count; $i++) {
             $info = $infos[$i]
+            if ($info.parent -eq "" -and (IsOutOfBounds $info $slideWidth $slideHeight)) {
+                $issues += @{
+                    kind = "out_of_bounds"
+                    slide = $s
+                    name = $info.name
+                    box = @{
+                        left = [Math]::Round($info.left, 2)
+                        top = [Math]::Round($info.top, 2)
+                        width = [Math]::Round($info.width, 2)
+                        height = [Math]::Round($info.height, 2)
+                        right = [Math]::Round($info.right, 2)
+                        bottom = [Math]::Round($info.bottom, 2)
+                    }
+                    slide_width = [Math]::Round($slideWidth, 2)
+                    slide_height = [Math]::Round($slideHeight, 2)
+                }
+            }
             if ($info.has_text -and -not $info.decorative_text) {
                 $shape = $null
                 $overflowW = $info.text_bound_width - $info.width
@@ -161,7 +201,6 @@ try {
 
         for ($a = 0; $a -lt $infos.Count; $a++) {
             $ia = $infos[$a]
-            if (-not $ia.has_text -or $ia.decorative_text) { continue }
             $boxA = @{ left=$ia.left; top=$ia.top; right=$ia.right; bottom=$ia.bottom; width=$ia.width; height=$ia.height }
             for ($b = $a + 1; $b -lt $infos.Count; $b++) {
                 $ib = $infos[$b]
@@ -171,8 +210,11 @@ try {
                 $minArea = [Math]::Max(1.0, [Math]::Min($ia.width * $ia.height, $ib.width * $ib.height))
                 $ratio = $area / $minArea
                 if ($ratio -lt $OverlapToleranceRatio) { continue }
+                if (($ia.has_text -and $ia.decorative_text) -or ($ib.has_text -and $ib.decorative_text)) { continue }
 
-                if ($ib.has_text -and -not $ib.decorative_text) {
+                $aIsText = $ia.has_text -and -not $ia.decorative_text
+                $bIsText = $ib.has_text -and -not $ib.decorative_text
+                if ($aIsText -and $bIsText) {
                     $issues += @{
                         kind = "text_text_overlap"
                         slide = $s
@@ -198,30 +240,39 @@ try {
                         }
                         ratio = [Math]::Round($ratio, 3)
                     }
-                } elseif (-not $ib.has_text) {
-                    $isPanel = ($ib.name -match 'PANEL|RECT|BACKGROUND|CARD|BOX')
-                    if (-not $isPanel -and $ratio -ge $OverlapToleranceRatio) {
+                } elseif ($aIsText -or $bIsText) {
+                    $textInfo = if ($aIsText) { $ia } else { $ib }
+                    $shapeInfo = if ($aIsText) { $ib } else { $ia }
+                    $textBox = if ($aIsText) { $boxA } else { $boxB }
+                    $shapeBox = if ($aIsText) { $boxB } else { $boxA }
+                    $textIsInsideBackground = (
+                        $shapeInfo.parent -eq $textInfo.parent -and
+                        $shapeInfo.z_order -gt 0 -and
+                        $shapeInfo.z_order -lt $textInfo.z_order -and
+                        (ContainsBox $shapeBox $textBox)
+                    )
+                    if (-not $textIsInsideBackground) {
                         $issues += @{
                             kind = "text_shape_overlap"
                             slide = $s
-                            text_shape = $ia.name
-                            other_shape = $ib.name
-                            text = $ia.text
+                            text_shape = $textInfo.name
+                            other_shape = $shapeInfo.name
+                            text = $textInfo.text
                             text_box = @{
-                                left = [Math]::Round($ia.left, 2)
-                                top = [Math]::Round($ia.top, 2)
-                                width = [Math]::Round($ia.width, 2)
-                                height = [Math]::Round($ia.height, 2)
-                                right = [Math]::Round($ia.right, 2)
-                                bottom = [Math]::Round($ia.bottom, 2)
+                                left = [Math]::Round($textInfo.left, 2)
+                                top = [Math]::Round($textInfo.top, 2)
+                                width = [Math]::Round($textInfo.width, 2)
+                                height = [Math]::Round($textInfo.height, 2)
+                                right = [Math]::Round($textInfo.right, 2)
+                                bottom = [Math]::Round($textInfo.bottom, 2)
                             }
                             other_box = @{
-                                left = [Math]::Round($ib.left, 2)
-                                top = [Math]::Round($ib.top, 2)
-                                width = [Math]::Round($ib.width, 2)
-                                height = [Math]::Round($ib.height, 2)
-                                right = [Math]::Round($ib.right, 2)
-                                bottom = [Math]::Round($ib.bottom, 2)
+                                left = [Math]::Round($shapeInfo.left, 2)
+                                top = [Math]::Round($shapeInfo.top, 2)
+                                width = [Math]::Round($shapeInfo.width, 2)
+                                height = [Math]::Round($shapeInfo.height, 2)
+                                right = [Math]::Round($shapeInfo.right, 2)
+                                bottom = [Math]::Round($shapeInfo.bottom, 2)
                             }
                             ratio = [Math]::Round($ratio, 3)
                         }

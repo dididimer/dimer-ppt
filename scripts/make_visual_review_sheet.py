@@ -7,8 +7,24 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageStat
 
 
-def fit(im: Image.Image, size: tuple[int, int]) -> Image.Image:
-    return im.convert("RGB").resize(size, Image.Resampling.LANCZOS)
+def scaled_size(size: tuple[int, int], max_size: tuple[int, int]) -> tuple[int, int]:
+    """Return an aspect-ratio-preserving size that fits within max_size."""
+    width, height = size
+    max_width, max_height = max_size
+    scale = min(max_width / width, max_height / height)
+    return max(1, round(width * scale)), max(1, round(height * scale))
+
+
+def scale_and_center(im: Image.Image, canvas_size: tuple[int, int]) -> Image.Image:
+    """Scale an image proportionally and center it on a common review canvas."""
+    converted = im.convert("RGB")
+    target_size = scaled_size(converted.size, canvas_size)
+    scaled = converted.resize(target_size, Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", canvas_size, "white")
+    x = (canvas.width - scaled.width) // 2
+    y = (canvas.height - scaled.height) // 2
+    canvas.paste(scaled, (x, y))
+    return canvas
 
 
 def main() -> int:
@@ -16,12 +32,21 @@ def main() -> int:
     parser.add_argument("--source", required=True, help="Original source image.")
     parser.add_argument("--render", required=True, help="Rendered PPT slide PNG.")
     parser.add_argument("--out", required=True, help="Output review sheet PNG.")
-    parser.add_argument("--width", type=int, default=1536)
-    parser.add_argument("--height", type=int, default=1024)
+    parser.add_argument("--width", type=int, default=1536, help="Maximum review-panel width.")
+    parser.add_argument("--height", type=int, default=1024, help="Maximum review-panel height.")
     args = parser.parse_args()
 
-    src = fit(Image.open(args.source), (args.width, args.height))
-    ren = fit(Image.open(args.render), (args.width, args.height))
+    if args.width <= 0 or args.height <= 0:
+        parser.error("--width and --height must be positive")
+
+    with Image.open(args.source) as source_image, Image.open(args.render) as render_image:
+        max_input_size = (
+            max(source_image.width, render_image.width),
+            max(source_image.height, render_image.height),
+        )
+        canvas_size = scaled_size(max_input_size, (args.width, args.height))
+        src = scale_and_center(source_image, canvas_size)
+        ren = scale_and_center(render_image, canvas_size)
     diff = ImageChops.difference(src, ren)
     stat = ImageStat.Stat(diff)
     mean = sum(stat.mean) / 3
@@ -30,8 +55,9 @@ def main() -> int:
 
     label_h = 44
     gutter = 16
-    sheet_w = args.width * 3 + gutter * 4
-    sheet_h = args.height + label_h + gutter * 2
+    panel_width, panel_height = canvas_size
+    sheet_w = panel_width * 3 + gutter * 4
+    sheet_h = panel_height + label_h + gutter * 2
     sheet = Image.new("RGB", (sheet_w, sheet_h), "white")
     draw = ImageDraw.Draw(sheet)
 
@@ -42,15 +68,15 @@ def main() -> int:
     ]
     x = gutter
     for label, im in panels:
-        draw.rectangle([x - 1, gutter - 1, x + args.width + 1, gutter + args.height + 1], outline=(80, 80, 80), width=2)
+        draw.rectangle([x - 1, gutter - 1, x + panel_width + 1, gutter + panel_height + 1], outline=(80, 80, 80), width=2)
         sheet.paste(im, (x, gutter))
-        draw.text((x, gutter + args.height + 10), label, fill=(0, 0, 0))
-        x += args.width + gutter
+        draw.text((x, gutter + panel_height + 10), label, fill=(0, 0, 0))
+        x += panel_width + gutter
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(out)
-    print({"out": str(out), "mean_abs_diff": round(mean, 3), "rms": round(rms, 3)})
+    print({"out": str(out), "panel_size": canvas_size, "mean_abs_diff": round(mean, 3), "rms": round(rms, 3)})
     return 0
 
 

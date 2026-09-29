@@ -1,0 +1,130 @@
+{
+  "input": "examples\\native-icons\\before.pptx",
+  "output": "examples\\native-icons\\after.pptx",
+  "replaced": [
+    {
+      "slide": 1,
+      "picture": "Image 0",
+      "icon": "top_dialogue",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 1",
+      "icon": "top_candidates",
+      "native_shapes": 15
+    },
+    {
+      "slide": 1,
+      "picture": "Image 2",
+      "icon": "top_gold",
+      "native_shapes": 9
+    },
+    {
+      "slide": 1,
+      "picture": "Image 3",
+      "icon": "robot",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 4",
+      "icon": "shield",
+      "native_shapes": 3
+    },
+    {
+      "slide": 1,
+      "picture": "Image 5",
+      "icon": "puzzle",
+      "native_shapes": 1
+    },
+    {
+      "slide": 1,
+      "picture": "Image 6",
+      "icon": "logic",
+      "native_shapes": 5
+    },
+    {
+      "slide": 1,
+      "picture": "Image 7",
+      "icon": "heart",
+      "native_shapes": 3
+    },
+    {
+      "slide": 1,
+      "picture": "Image 8",
+      "icon": "robot",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 9",
+      "icon": "robot",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 10",
+      "icon": "robot",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 11",
+      "icon": "best_doc_check",
+      "native_shapes": 8
+    },
+    {
+      "slide": 1,
+      "picture": "Image 12",
+      "icon": "trophy",
+      "native_shapes": 8
+    },
+    {
+      "slide": 1,
+      "picture": "Image 14",
+      "icon": "robot",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 15",
+      "icon": "warning",
+      "native_shapes": 3
+    },
+    {
+      "slide": 1,
+      "picture": "Image 16",
+      "icon": "trophy",
+      "native_shapes": 8
+    },
+    {
+      "slide": 1,
+      "picture": "Image 17",
+      "icon": "robot",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 18",
+      "icon": "robot",
+      "native_shapes": 13
+    },
+    {
+      "slide": 1,
+      "picture": "Image 19",
+      "icon": "shield",
+      "native_shapes": 3
+    },
+    {
+      "slide": 1,
+      "picture": "Image 21",
+      "icon": "heart",
+      "native_shapes": 3
+    }
+  ],
+  "skipped": [],
+  "missing": [],
+  "pictures_before": 23,
+  "pictures_after": 3
+}
